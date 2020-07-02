@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Receiver</title>
+
+		<script src="js/aes.js"></script>
+		<script src="js/sha256.js"></script>
+		<script src="js/pbkdf2.js"></script>
+		<script src="js/AES256.js"></script>
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js" integrity="sha256-bQmrZe4yPnQrLTY+1gYylfNMBuGfnT/HKsCGX+9Xuqo=" crossorigin="anonymous"></script>
+	</head>
+	<body>
+		<video id="videoPlayer" autoplay></video>
+		<script>
+			const aes = new AES256(1);
+			const socket = io('http://localhost:8888');
+
+			const arrayOfBlobs = [];
+			const mediaSource = new MediaSource();
+			const videoPlayer = document.getElementById('videoPlayer');
+			videoPlayer.src = URL.createObjectURL(mediaSource);
+
+			let sourceBuffer = null;
+			mediaSource.addEventListener('sourceopen', function () {
+				sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="opus,vp8"');
+				sourceBuffer.addEventListener('updateend', appendToSourceBuffer);
+			});
+
+			function appendToSourceBuffer() {
+				if (mediaSource.readyState === 'open' && sourceBuffer && sourceBuffer.updating === false && arrayOfBlobs.length > 0) {
+					let chunk = arrayOfBlobs.shift();
+					sourceBuffer.appendBuffer(chunk);
+					videoPlayer.play();
+				}
+
+				// Limit the total buffer size to 20 minutes. This way we don't run out of RAM.
+				if (videoPlayer.buffered.length && videoPlayer.buffered.end(0) - videoPlayer.buffered.start(0) > 1200) {
+					sourceBuffer.remove(0, videoPlayer.buffered.end(0) - 1200);
+				}
+			}
+
+			socket.on('data', async (data) => {
+				const dec = aes.decrypt(data, 'Zafer123');
+				arrayOfBlobs.push(await dataURItoBlob(dec).arrayBuffer());
+				appendToSourceBuffer();
+			});
+
+			function dataURItoBlob(dataURI) {
+				const byteString = atob(dataURI.split(',')[1]);
+				const ab = new ArrayBuffer(byteString.length);
+				const ia = new Uint8Array(ab);
+
+				for (let i = 0; i < byteString.length; i++) {
+					ia[i] = byteString.charCodeAt(i);
+				}
+
+				return new Blob([ab], { type: 'video/webm; codecs="opus,vp8"' });
+			}
+		</script>
+	</body>
+</html>

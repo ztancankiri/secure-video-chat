@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Sender</title>
+
+		<script src="js/aes.js"></script>
+		<script src="js/sha256.js"></script>
+		<script src="js/pbkdf2.js"></script>
+		<script src="js/AES256.js"></script>
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.3.0/socket.io.js" integrity="sha256-bQmrZe4yPnQrLTY+1gYylfNMBuGfnT/HKsCGX+9Xuqo=" crossorigin="anonymous"></script>
+	</head>
+	<body>
+		<button onclick="start();">Start</button>
+		<script>
+			async function start() {
+				const aes = new AES256(1);
+				const socket = io('http://localhost:8888');
+
+				try {
+					const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+					const recorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm; codecs="opus,vp8"' });
+
+					recorder.ondataavailable = (event) => {
+						if (event.data && event.data.size > 0) {
+							const blob = new Blob([event.data]);
+							const reader = new FileReader();
+
+							reader.readAsDataURL(blob);
+							reader.onloadend = () => {
+								const enc = aes.encrypt(reader.result, 'Zafer123');
+								socket.emit('data', enc);
+							};
+						}
+					};
+
+					recorder.start(3000);
+				} catch (error) {
+					console.log(error);
+				}
+			}
+		</script>
+	</body>
+</html>
