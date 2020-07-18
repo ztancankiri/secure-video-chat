@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Secure Video Chat by Ztan</title>
+
+		<script src="js/sha256.js"></script>
+		<script src="js/aes.js"></script>
+		<script src="js/pbkdf2.js"></script>
+		<script src="js/jquery-3.5.1.slim.min.js"></script>
+
+		<script src="js/socket.io.js"></script>
+	</head>
+	<body>
+		<table>
+			<tr>
+				<td><label for="salt">Salt: </label></td>
+				<td><input id="salt" type="text" /></td>
+			</tr>
+			<tr>
+				<td><label for="iv">IV: </label></td>
+				<td><input id="iv" type="text" /></td>
+			</tr>
+			<tr>
+				<td><label for="passphrase">Passphrase: </label></td>
+				<td><input id="passphrase" type="text" /></td>
+			</tr>
+			<tr>
+				<td><label for="iteration">Iteration: </label></td>
+				<td><input id="iteration" type="number" /></td>
+			</tr>
+			<tr>
+				<td><button id="btn_random">Random</button></td>
+				<td>
+					<button id="btn_receive">Receive</button>
+					<button id="btn_send">Send</button>
+				</td>
+			</tr>
+		</table>
+
+		<video id="videoPlayer" autoplay></video>
+
+		<script src="js/main.js"></script>
+	</body>
+</html>
