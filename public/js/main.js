@@ -2,6 +2,14 @@ let salt = null;
 let iv = null;
 let key = null;
 
+const arrayOfBlobs = [];
+const mediaSource = new MediaSource();
+const videoPlayer = document.getElementById('videoPlayer');
+let sourceBuffer = null;
+
+let peer = null;
+let initiator = false;
+
 function generateBytes(text) {
     const bytes = CryptoJS.SHA256(text);
     bytes.sigBytes = 16;
@@ -31,8 +39,6 @@ function init() {
 }
 
 async function send() {
-    const socket = io('http://localhost:8888');
-
     try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         const recorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm; codecs="opus,vp8"' });
@@ -45,7 +51,7 @@ async function send() {
                 reader.readAsDataURL(blob);
                 reader.onloadend = () => {
                     const enc = CryptoJS.AES.encrypt(reader.result, key, { iv }).toString();
-                    socket.emit('data', enc);
+                    peer.send(enc);
                 };
             }
         };
@@ -56,52 +62,38 @@ async function send() {
     }
 }
 
-function receive() {
-    const socket = io('http://localhost:8888');
+function appendToSourceBuffer() {
+    if (mediaSource.readyState === 'open' && sourceBuffer && sourceBuffer.updating === false && arrayOfBlobs.length > 0) {
+        let chunk = arrayOfBlobs.shift();
+        sourceBuffer.appendBuffer(chunk);
+        videoPlayer.play();
+    }
 
-    const arrayOfBlobs = [];
-    const mediaSource = new MediaSource();
-    const videoPlayer = document.getElementById('videoPlayer');
+    // Limit the total buffer size to 20 minutes. This way we don't run out of RAM.
+    if (videoPlayer.buffered.length && videoPlayer.buffered.end(0) - videoPlayer.buffered.start(0) > 1200) {
+        sourceBuffer.remove(0, videoPlayer.buffered.end(0) - 1200);
+    }
+}
+
+function dataURItoBlob(dataURI) {
+    const byteString = atob(dataURI.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+
+    for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+
+    return new Blob([ab], { type: 'video/webm; codecs="opus,vp8"' });
+}
+
+function receive() {
     videoPlayer.src = URL.createObjectURL(mediaSource);
 
-    let sourceBuffer = null;
     mediaSource.addEventListener('sourceopen', function () {
         sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="opus,vp8"');
         sourceBuffer.addEventListener('updateend', appendToSourceBuffer);
     });
-
-    socket.on('data', async (data) => {
-        const ciphertext = CryptoJS.enc.Base64.parse(data);
-        const decrypted = CryptoJS.AES.decrypt({ ciphertext }, key, { iv }).toString(CryptoJS.enc.Utf8);
-
-        arrayOfBlobs.push(await dataURItoBlob(decrypted).arrayBuffer());
-        appendToSourceBuffer();
-    });
-
-    function appendToSourceBuffer() {
-        if (mediaSource.readyState === 'open' && sourceBuffer && sourceBuffer.updating === false && arrayOfBlobs.length > 0) {
-            let chunk = arrayOfBlobs.shift();
-            sourceBuffer.appendBuffer(chunk);
-            videoPlayer.play();
-        }
-
-        // Limit the total buffer size to 20 minutes. This way we don't run out of RAM.
-        if (videoPlayer.buffered.length && videoPlayer.buffered.end(0) - videoPlayer.buffered.start(0) > 1200) {
-            sourceBuffer.remove(0, videoPlayer.buffered.end(0) - 1200);
-        }
-    }
-
-    function dataURItoBlob(dataURI) {
-        const byteString = atob(dataURI.split(',')[1]);
-        const ab = new ArrayBuffer(byteString.length);
-        const ia = new Uint8Array(ab);
-
-        for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-        }
-
-        return new Blob([ab], { type: 'video/webm; codecs="opus,vp8"' });
-    }
 }
 
 $('#btn_random').click((e) => {
@@ -118,4 +110,65 @@ $('#btn_receive').click((e) => {
 $('#btn_send').click((e) => {
     init();
     send();
+});
+
+$('#btn_call').click((e) => {
+    initiator = true;
+
+    peer = new SimplePeer({
+        initiator: true,
+        trickle: false,
+    });
+
+    peer.on('error', error => {
+        console.log('[ERROR]: ', error);
+    });
+
+    peer.on('signal', data => {
+        $('#caller').val(btoa(JSON.stringify(data)));
+    });
+
+    peer.on('connect', () => {
+        console.log('[CONNECTED]');
+    });
+
+    peer.on('data', async data => {
+        const ciphertext = CryptoJS.enc.Base64.parse(data);
+        const decrypted = CryptoJS.AES.decrypt({ ciphertext }, key, { iv }).toString(CryptoJS.enc.Utf8);
+
+        arrayOfBlobs.push(await dataURItoBlob(decrypted).arrayBuffer());
+        appendToSourceBuffer();
+    });
+});
+
+$('#btn_answer').click((e) => {
+    if (!initiator) {
+        peer = new SimplePeer({
+            initiator: false,
+            trickle: false,
+        });
+
+        peer.on('error', error => {
+            console.log('[ERROR]: ', error);
+        });
+
+        peer.on('signal', data => {
+            $('#caller').val(btoa(JSON.stringify(data)));
+        });
+
+        peer.on('connect', () => {
+            console.log('[CONNECTED]');
+        });
+
+        peer.on('data', async data => {
+            const ciphertext = CryptoJS.enc.Base64.parse(data.toString());
+            const decrypted = CryptoJS.AES.decrypt({ ciphertext }, key, { iv }).toString(CryptoJS.enc.Utf8);
+
+            arrayOfBlobs.push(await dataURItoBlob(decrypted).arrayBuffer());
+            appendToSourceBuffer();
+        });
+    }
+
+    const callee_text = atob($('#callee').val());
+    peer.signal(JSON.parse(callee_text));
 });
