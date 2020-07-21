@@ -31,7 +31,7 @@ function init() {
 }
 
 async function send() {
-    const socket = io('http://localhost:8888');
+    const socket = io('http://130.211.51.58');
 
     try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -57,7 +57,7 @@ async function send() {
 }
 
 function receive() {
-    const socket = io('http://localhost:8888');
+    const socket = io('http://130.211.51.58');
 
     const arrayOfBlobs = [];
     const mediaSource = new MediaSource();
