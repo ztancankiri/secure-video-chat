@@ -3,24 +3,17 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>P2P Secure Video Chat by Ztan</title>
+		<title>Secure Video Chat by Ztan</title>
 
 		<script src="js/sha256.js"></script>
 		<script src="js/aes.js"></script>
 		<script src="js/pbkdf2.js"></script>
 		<script src="js/jquery-3.5.1.slim.min.js"></script>
 
-		<script src="js/simplepeer.min.js"></script>
+		<script src="js/socket.io.js"></script>
 	</head>
 	<body>
 		<table>
-			<tr>
-				<td><button id="btn_call">Call</button></td>
-				<td><input id="caller" type="text" /></td>
-				<td><input id="callee" type="text" /></td>
-				<td><button id="btn_answer">Answer</button></td>
-			</tr>
-
 			<tr>
 				<td><label for="salt">Salt: </label></td>
 				<td><input id="salt" type="text" /></td>
